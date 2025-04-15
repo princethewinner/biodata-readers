@@ -9,6 +9,10 @@ packages = [{ include = "biodata_readers", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 importlib-metadata = { version = "~=1.0", python = "<3.8" }
+fuc = "^0.38.0"
+loguru = "^0.7.3"
+tqdm = "^4.67.1"
+gffpandas = "^1.2.0"
 
 [tool.poetry.group.dev]
 optional = true
