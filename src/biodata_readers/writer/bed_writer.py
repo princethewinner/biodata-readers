@@ -76,6 +76,12 @@ class BedWriter(Writer):  # type: ignore
 
 class BedConverter(BedWriter):
 
+    # from: https://genome.ucsc.edu/FAQ/FAQformat.html#format1
+    # chrom - The name of the chromosome (e.g. chr3, chrY, chr2_random) or scaffold (e.g. scaffold10671). Many assemblies also support several different chromosome aliases (e.g. '1' or 'NC_000001.11' in place of 'chr1').
+    # chromStart - The starting position of the feature in the chromosome or scaffold. The first base in a chromosome is numbered 0.
+    # chromEnd - The ending position of the feature in the chromosome or scaffold. The chromEnd base is not included in the display of the feature, however, the number in position format will be represented. For example, the first 100 bases of chromosome 1 are defined as chrom=1, chromStart=0, chromEnd=100, and span the bases numbered 0-99 in our software (not 0-100), but will represent the position notation chr1:1-100. Read more here.
+    # chromStart and chromEnd can be identical, creating a feature of length 0, commonly used for insertions. For example, use chromStart=0, chromEnd=0 to represent an insertion before the first nucleotide of a chromosome.
+
     def __init__(
         self,
         data: pd.DataFrame,
@@ -115,6 +121,9 @@ class BedConverter(BedWriter):
             self._data[self.START_COL] = self._data[self.START_COL] - 1
             if not is_end_included:
                 self._data[self.END_COL] = self._data[self.END_COL] - 1
+        else:
+            if is_end_included:
+                self._data[self.END_COL] = self._data[self.END_COL] + 1
 
         column_order: tp.List[str] = list(self._data.columns)
         for rq in self.MINIMAL_REQUIRED_COLUMNS:
