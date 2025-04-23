@@ -71,4 +71,4 @@ node_modules/
 
 # Ignore dot env
 *.env
-main.py
+main*
