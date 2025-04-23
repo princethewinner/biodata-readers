@@ -14,12 +14,14 @@ class BedWriter(Writer):  # type: ignore
     START_COL: tp.ClassVar[str] = "Start"
     END_COL: tp.ClassVar[str] = "End"
     NAME_COL: tp.ClassVar[str] = "Type"
+    SCORE_COL: tp.ClassVar[str] = "Score"
+    STRAND_COL: tp.ClassVar[str] = "Strand"
 
     MINIMAL_REQUIRED_COLUMNS: tp.List[str] = [
         SEQUENCE_COL,
         START_COL,
         END_COL,
-        NAME_COL,
+        NAME_COL
     ]
 
     CANONICAL_CHROMOSOMES: tp.List[str] = list(
@@ -32,18 +34,23 @@ class BedWriter(Writer):  # type: ignore
         output_file: tp.Union[str, Path],
         only_required: bool = True,
         only_canonical: bool = True,
+        additional_column: tp.Optional[tp.List[str]] = None,
     ) -> None:
         super().__init__(output_file=output_file)
         self._data: pd.DataFrame = data
         self.only_required: bool = only_required
         self.only_canonical: bool = only_canonical
+        self.additional_column: tp.Optional[tp.List[str]] = additional_column
 
     def _write(self, data: pd.DataFrame, output_file: str) -> None:
 
         meta: tp.List[str] = []
-        if self.only_required:
-            data = data[self.MINIMAL_REQUIRED_COLUMNS]
-
+        req_columns: tp.List[str] = self.MINIMAL_REQUIRED_COLUMNS.copy()
+        if not self.only_required:
+            if self.additional_column is not None:
+                req_columns.extend(self.additional_column)
+            
+        data = data[req_columns]
         _bedDataFrame: BedFrame = BedFrame.from_frame(meta=meta, data=data)
         _bedDataFrame.to_file(output_file)
         logger.success(f"BED file written at location: {output_file}")
@@ -89,12 +96,14 @@ class BedConverter(BedWriter):
         output_file: tp.Union[str, Path],
         only_required: bool = True,
         only_canonical: bool = True,
+        additional_column: tp.Optional[tp.List[str]] = None,
     ) -> None:
         super().__init__(
             data=data,
             output_file=output_file,
             only_required=only_required,
             only_canonical=only_canonical,
+            additional_column=additional_column
         )
         self.column_map: tp.Union[str, Path, tp.Dict[str, str]] = column_map_file
 
