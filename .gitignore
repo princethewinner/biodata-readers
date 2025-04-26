@@ -72,3 +72,4 @@ node_modules/
 # Ignore dot env
 *.env
 main*
+notes

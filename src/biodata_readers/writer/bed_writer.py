@@ -4,8 +4,10 @@ from pathlib import Path
 from fuc.api.pybed import BedFrame
 from biodata_readers.writer.abstraction import Writer
 import pandas as pd
+import pandas.api.typing as pdtp
 import json
 from loguru import logger
+from tqdm.auto import tqdm
 
 
 class BedWriter(Writer):  # type: ignore
@@ -13,7 +15,7 @@ class BedWriter(Writer):  # type: ignore
     SEQUENCE_COL: tp.ClassVar[str] = "Chromosome"
     START_COL: tp.ClassVar[str] = "Start"
     END_COL: tp.ClassVar[str] = "End"
-    NAME_COL: tp.ClassVar[str] = "Type"
+    NAME_COL: tp.ClassVar[str] = "Name"
     SCORE_COL: tp.ClassVar[str] = "Score"
     STRAND_COL: tp.ClassVar[str] = "Strand"
 
@@ -22,6 +24,17 @@ class BedWriter(Writer):  # type: ignore
         START_COL,
         END_COL,
         NAME_COL
+    ]
+
+    ADDITIONAL_COLUMN_ORDER: tp.List[str] = [
+        SCORE_COL,
+        STRAND_COL
+    ]
+
+    UNIQUE_GROUP_COLUMNS: tp.List[str] = [
+        SEQUENCE_COL,
+        START_COL,
+        END_COL
     ]
 
     CANONICAL_CHROMOSOMES: tp.List[str] = list(
@@ -34,13 +47,64 @@ class BedWriter(Writer):  # type: ignore
         output_file: tp.Union[str, Path],
         only_required: bool = True,
         only_canonical: bool = True,
+        only_unique: bool = True,
         additional_column: tp.Optional[tp.List[str]] = None,
     ) -> None:
         super().__init__(output_file=output_file)
         self._data: pd.DataFrame = data
         self.only_required: bool = only_required
         self.only_canonical: bool = only_canonical
+        self.only_unique: bool = only_unique
         self.additional_column: tp.Optional[tp.List[str]] = additional_column
+
+    def _getColumnOrder(self, data: tp.Optional[pd.DataFrame] = None) -> tp.List[str]:
+        
+        if data is None:
+            data = self._data
+        
+        column_order: tp.List[str] = list(data.columns)
+        for rq in self.MINIMAL_REQUIRED_COLUMNS:
+            column_order.remove(rq)
+
+        additional_columns: tp.List[str] = []
+        for c in self.ADDITIONAL_COLUMN_ORDER:
+            if c in column_order:
+                additional_columns.append(c)
+
+        column_order = self.MINIMAL_REQUIRED_COLUMNS + additional_columns
+        return column_order
+
+    def _getOnlyUnique(self, data: pd.DataFrame) -> pd.DataFrame:
+
+        group_by_columns: tp.List[str] = self.UNIQUE_GROUP_COLUMNS.copy()
+
+        if self.STRAND_COL in data.columns:
+            logger.debug(f"{self.STRAND_COL} found in data columns. Adding it to group by columns list.")
+            group_by_columns.append(self.STRAND_COL)
+
+        logger.info("Merging non unique columns.")
+        group: pdtp.DataFrameGroupBy = data.groupby(by=group_by_columns)
+        merge_keys: tp.List[str] = list(set(data.columns) - set(group_by_columns))
+        sampled_df: pd.DataFrame
+        key_holder: tp.List[str]
+        data_holder: tp.List[tp.List[tp.Any]] = []
+
+        logger.debug(f"Keys selected for merging: {merge_keys}")
+
+        gr: tp.Any
+        for gr in tqdm(group.groups.keys(), total=len(group), desc="Merging non unique"):
+            sampled_df = group.get_group(gr)[merge_keys]
+            key_holder = []
+            for k in merge_keys:
+                key_holder.append(
+                    ",".join(set(sampled_df[k]))
+                )
+            gr = list(gr)
+            gr.extend(key_holder)
+            data_holder.append(gr)
+
+        column_header: tp.List[str] = group_by_columns + merge_keys
+        return pd.DataFrame(data_holder, columns=column_header)
 
     def _write(self, data: pd.DataFrame, output_file: str) -> None:
 
@@ -49,8 +113,19 @@ class BedWriter(Writer):  # type: ignore
         if not self.only_required:
             if self.additional_column is not None:
                 req_columns.extend(self.additional_column)
-            
+
         data = data[req_columns]
+
+        logger.debug(f"Columns in selected data frame: {data.columns}")
+        logger.debug(f"Total number of samples in dataframe: {data.shape}")
+
+        column_order: tp.List[str]
+        if self.only_unique:
+            data = self._getOnlyUnique(data)
+            column_order = self._getColumnOrder(data)
+            data = data[column_order]
+
+        logger.debug(f"Total number of samples in dataframe (AFTER selecting uniques): {data.shape}")
         _bedDataFrame: BedFrame = BedFrame.from_frame(meta=meta, data=data)
         _bedDataFrame.to_file(output_file)
         logger.success(f"BED file written at location: {output_file}")
@@ -96,6 +171,7 @@ class BedConverter(BedWriter):
         output_file: tp.Union[str, Path],
         only_required: bool = True,
         only_canonical: bool = True,
+        only_unique: bool = True,
         additional_column: tp.Optional[tp.List[str]] = None,
     ) -> None:
         super().__init__(
@@ -103,7 +179,8 @@ class BedConverter(BedWriter):
             output_file=output_file,
             only_required=only_required,
             only_canonical=only_canonical,
-            additional_column=additional_column
+            additional_column=additional_column,
+            only_unique=only_unique
         )
         self.column_map: tp.Union[str, Path, tp.Dict[str, str]] = column_map_file
 
@@ -134,9 +211,5 @@ class BedConverter(BedWriter):
             if is_end_included:
                 self._data[self.END_COL] = self._data[self.END_COL] + 1
 
-        column_order: tp.List[str] = list(self._data.columns)
-        for rq in self.MINIMAL_REQUIRED_COLUMNS:
-            column_order.remove(rq)
-
-        column_order = self.MINIMAL_REQUIRED_COLUMNS + column_order
+        column_order: tp.List[str] = self._getColumnOrder()
         self._data = self._data[column_order]
