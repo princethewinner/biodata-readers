@@ -124,8 +124,8 @@ class BedWriter(Writer):  # type: ignore
             data = self._getOnlyUnique(data)
             column_order = self._getColumnOrder(data)
             data = data[column_order]
+            logger.debug(f"Total number of samples in dataframe (AFTER selecting uniques): {data.shape}")
 
-        logger.debug(f"Total number of samples in dataframe (AFTER selecting uniques): {data.shape}")
         _bedDataFrame: BedFrame = BedFrame.from_frame(meta=meta, data=data)
         _bedDataFrame.to_file(output_file)
         logger.success(f"BED file written at location: {output_file}")
