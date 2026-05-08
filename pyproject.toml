@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "biodata-readers"
+version = "0.0.0"
+description = "This is a repo used to manage different types of bioinformatics related file read write operations."
+authors = ["Prashant Gupta <pg20@sanger.ac.uk>; Prashant Gupta <prashant10991@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "biodata_readers", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+importlib-metadata = { version = "~=1.0", python = "<3.8" }
+fuc = "^0.38.0"
+loguru = "^0.7.3"
+tqdm = "^4.67.1"
+gffpandas = "^1.2.0"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.26.0"
+ipykernel = "^6.29.5"
+black = "24.8.0"
+flake8 = "7.1.1"
+mypy = "v1.11.0"
+pre-commit = "3.8.0"
+pytest = "^8.3.2"
+ipywidgets = "^8.1.3"
+types-requests = "^2.32.0.20240622"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
